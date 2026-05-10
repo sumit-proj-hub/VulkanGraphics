@@ -32,6 +32,14 @@ void Swapchain::create(const VulkanContext &ctx, const Window &window) {
   }
 }
 
+void Swapchain::recreate(const VulkanContext &ctx, const Window &window) {
+  ctx.getDevice().waitIdle();
+  swapChain = nullptr;
+  imageViews.clear();
+  images.clear();
+  create(ctx, window);
+};
+
 vk::Extent2D Swapchain::chooseSwapExtent(vk::Extent2D framebufferSize, const vk::SurfaceCapabilitiesKHR &capabilities) {
   if (capabilities.currentExtent.width != UINT32_MAX) {
     return capabilities.currentExtent;

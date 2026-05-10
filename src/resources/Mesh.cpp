@@ -16,9 +16,8 @@ Mesh::Mesh(const VulkanContext &ctx, std::span<const Vertex> vertices, std::span
     : vertexBuffer(createVertexBuffer(ctx, vertices)), indexBuffer(createIndexBuffer(ctx, indices)),
       indexCount(indices.size()) {}
 
-void Mesh::bind(const vk::raii::CommandBuffer &cmd) const {
+void Mesh::draw(const vk::raii::CommandBuffer &cmd) const {
   cmd.bindVertexBuffers(0, *vertexBuffer.get(), {0});
   cmd.bindIndexBuffer(*indexBuffer.get(), 0, vk::IndexType::eUint16);
+  cmd.drawIndexed(indexCount, 1, 0, 0, 0);
 }
-
-void Mesh::draw(const vk::raii::CommandBuffer &cmd) const { cmd.drawIndexed(indexCount, 1, 0, 0, 0); }

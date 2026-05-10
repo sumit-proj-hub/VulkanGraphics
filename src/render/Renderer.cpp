@@ -1,8 +1,9 @@
-#include "render/SceneUBO.hpp"
-#include "resources/Mesh.hpp"
+#include "render/RenderObject.hpp"
+#include "scene/Camera.hpp"
+#include "scene/PushConstants.hpp"
 #include <render/Renderer.hpp>
 
-void Renderer::recordCommands(uint32_t imageIndex, const Mesh &mesh) const {
+void Renderer::recordCommands(uint32_t imageIndex, std::span<const RenderObject> renderObjects) const {
   auto &commandBuffer = frameResources.getCommandBuffer(frameIndex);
   commandBuffer.begin({});
 
@@ -38,13 +39,16 @@ void Renderer::recordCommands(uint32_t imageIndex, const Mesh &mesh) const {
 
   commandBuffer.beginRendering(renderingInfo);
   commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.get());
-  mesh.bind(commandBuffer);
   commandBuffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapchain.getExtent().width),
                                             static_cast<float>(swapchain.getExtent().height), 0.0f, 1.0f));
   commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapchain.getExtent()));
   commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipeline.getLayout(), 0,
-                                   *frameResources.getDescriptorSet(frameIndex), nullptr);
-  mesh.draw(commandBuffer);
+                                   *frameResources.getGlobalDescriptorSet(frameIndex), nullptr);
+  for (auto &renderObject : renderObjects) {
+    PushConstants push{.model = renderObject.transform};
+    commandBuffer.pushConstants<PushConstants>(*pipeline.getLayout(), vk::ShaderStageFlagBits::eVertex, 0, push);
+    renderObject.draw(commandBuffer, pipeline.getLayout());
+  }
   commandBuffer.endRendering();
 
   Image::transitionImageLayout(swapchain.getImage(imageIndex), commandBuffer, vk::ImageLayout::eColorAttachmentOptimal,
@@ -54,8 +58,8 @@ void Renderer::recordCommands(uint32_t imageIndex, const Mesh &mesh) const {
   commandBuffer.end();
 }
 
-void Renderer::drawFrame(const VulkanContext &ctx, Window &window, const Mesh &mesh,
-                         std::function<void(SceneUBO &, float)> updateScene) {
+void Renderer::drawFrame(const VulkanContext &ctx, Window &window, std::span<const RenderObject> renderObjects,
+                         const Camera &camera) {
   auto fenceResult = ctx.getDevice().waitForFences(*frameResources.getInFlightFence(frameIndex), vk::True, UINT64_MAX);
   if (fenceResult != vk::Result::eSuccess) {
     throw std::runtime_error("Failed to wait for fence!");
@@ -72,13 +76,11 @@ void Renderer::drawFrame(const VulkanContext &ctx, Window &window, const Mesh &m
     throw std::runtime_error("Failed to acquire swapchain image!");
   }
 
-  SceneUBO ubo{};
-  updateScene(ubo, static_cast<float>(swapchain.getExtent().width) / static_cast<float>(swapchain.getExtent().height));
-  memcpy(frameResources.getUniformBuffer(frameIndex).getMapped(), &ubo, sizeof(ubo));
+  memcpy(frameResources.getUniformBuffer(frameIndex).getMapped(), &camera, sizeof(camera));
 
   ctx.getDevice().resetFences(*frameResources.getInFlightFence(frameIndex));
   frameResources.getCommandBuffer(frameIndex).reset();
-  recordCommands(imageIndex, mesh);
+  recordCommands(imageIndex, renderObjects);
 
   vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
   const vk::SubmitInfo submitInfo{.waitSemaphoreCount = 1,
@@ -100,4 +102,8 @@ void Renderer::drawFrame(const VulkanContext &ctx, Window &window, const Mesh &m
   }
 
   frameIndex = (frameIndex + 1) % maxFramesInFlight;
+}
+
+float Renderer::getAspectRatio() const {
+  return static_cast<float>(swapchain.getExtent().width) / static_cast<float>(swapchain.getExtent().height);
 }

@@ -2,12 +2,19 @@
 #include "resources/ResourceUtils.hpp"
 #include "resources/ShaderProgram.hpp"
 #include "resources/Vertex.hpp"
+#include "scene/PushConstants.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include <render/Pipeline.hpp>
 
 Pipeline::Pipeline(const VulkanContext &ctx, const ShaderProgram &shaderProgram,
                    vk::SurfaceFormatKHR swapchainSurfaceFormat) {
+  vk::DescriptorSetLayoutCreateInfo layoutInfo{.bindingCount = materialDescriptorSetBinding.size(),
+                                               .pBindings = materialDescriptorSetBinding.data()};
+  materialDescriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.getDevice(), layoutInfo);
+  layoutInfo = {.bindingCount = globalDescriptorSetBinding.size(), .pBindings = globalDescriptorSetBinding.data()};
+  globalDescriptorSetLayout = vk::raii::DescriptorSetLayout(ctx.getDevice(), layoutInfo);
+
   vk::PipelineShaderStageCreateInfo vertShaderStageInfo{.stage = vk::ShaderStageFlagBits::eVertex,
                                                         .module = shaderProgram.getShaderModule(),
                                                         .pName = ShaderProgram::vertEntry};
@@ -54,8 +61,13 @@ Pipeline::Pipeline(const VulkanContext &ctx, const ShaderProgram &shaderProgram,
   vk::PipelineDynamicStateCreateInfo dynamicState{.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
                                                   .pDynamicStates = dynamicStates.data()};
 
-  vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
-      .setLayoutCount = 1, .pSetLayouts = &*shaderProgram.getDescriptorSetLayout(), .pushConstantRangeCount = 0};
+  std::array<vk::DescriptorSetLayout, 2> setLayouts = {*globalDescriptorSetLayout, *materialDescriptorSetLayout};
+  vk::PushConstantRange pushConstantRange{
+      .stageFlags = vk::ShaderStageFlagBits::eVertex, .offset = 0, .size = sizeof(PushConstants)};
+  vk::PipelineLayoutCreateInfo pipelineLayoutInfo{.setLayoutCount = static_cast<uint32_t>(setLayouts.size()),
+                                                  .pSetLayouts = setLayouts.data(),
+                                                  .pushConstantRangeCount = 1,
+                                                  .pPushConstantRanges = &pushConstantRange};
   pipelineLayout = vk::raii::PipelineLayout(ctx.getDevice(), pipelineLayoutInfo);
 
   vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain{

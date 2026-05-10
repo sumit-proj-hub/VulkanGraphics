@@ -2,7 +2,6 @@
 
 #include "core/VulkanContext.hpp"
 #include "resources/Buffer.hpp"
-#include "resources/Texture.hpp"
 #include "vulkan/vulkan_raii.hpp"
 
 class FrameResources {
@@ -10,22 +9,23 @@ class FrameResources {
   std::vector<vk::raii::CommandBuffer> commandBuffers;
   std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
   std::vector<vk::raii::Fence> inFlightFences;
-  std::vector<vk::raii::DescriptorSet> descriptorSets;
+  std::vector<vk::raii::DescriptorSet> globalDescriptorSets;
 
   static std::vector<Buffer> createUniformBuffers(const VulkanContext &ctx);
-  void createDescriptorSets(const VulkanContext &ctx, const vk::raii::DescriptorSetLayout &descriptorSetLayout,
-                            const Texture &texture);
+  void createGlobalDescriptorSets(const VulkanContext &ctx,
+                                  const vk::raii::DescriptorSetLayout &gloablDescriptorSetLayout);
   void createCommandBuffers(const VulkanContext &ctx);
   void createSyncObjects(const VulkanContext &ctx);
 
 public:
-  FrameResources(const VulkanContext &ctx, const vk::raii::DescriptorSetLayout &descriptorSetLayout,
-                 const Texture &texture)
+  FrameResources(const VulkanContext &ctx, const vk::raii::DescriptorSetLayout &globalDescriptorSetLayout)
       : uniformBuffers(createUniformBuffers(ctx)) {
     createCommandBuffers(ctx);
     createSyncObjects(ctx);
-    createDescriptorSets(ctx, descriptorSetLayout, texture);
+    createGlobalDescriptorSets(ctx, globalDescriptorSetLayout);
   }
+  FrameResources(const FrameResources &) = delete;
+  FrameResources &operator=(const FrameResources &) = delete;
 
   const vk::raii::CommandBuffer &getCommandBuffer(uint32_t frameIndex) const { return commandBuffers[frameIndex]; }
   const Buffer &getUniformBuffer(uint32_t frameIndex) const { return uniformBuffers[frameIndex]; }
@@ -33,5 +33,7 @@ public:
     return presentCompleteSemaphores[frameIndex];
   }
   const vk::raii::Fence &getInFlightFence(uint32_t frameIndex) const { return inFlightFences[frameIndex]; }
-  const vk::raii::DescriptorSet &getDescriptorSet(uint32_t frameIndex) const { return descriptorSets[frameIndex]; }
+  const vk::raii::DescriptorSet &getGlobalDescriptorSet(uint32_t frameIndex) const {
+    return globalDescriptorSets[frameIndex];
+  }
 };

@@ -18,6 +18,5 @@ public:
   Mesh &operator=(const Mesh &) = delete;
 
   Mesh(const VulkanContext &ctx, std::span<const Vertex> vertices, std::span<const uint16_t> indices);
-  void bind(const vk::raii::CommandBuffer &cmd) const;
   void draw(const vk::raii::CommandBuffer &cmd) const;
 };

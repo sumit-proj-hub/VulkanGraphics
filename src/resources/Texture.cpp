@@ -7,7 +7,8 @@
 #include <stb_image.h>
 #include <string_view>
 
-Image Texture::createTextureImageFromFile(const VulkanContext &ctx, std::string_view filePath) {
+namespace {
+Image createTextureImageFromFile(const VulkanContext &ctx, std::string_view filePath) {
   int texWidth, texHeight, texChannels;
   stbi_uc *pixels = stbi_load(filePath.data(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
   vk::DeviceSize imageSize = texWidth * texHeight * 4;
@@ -48,3 +49,7 @@ Image Texture::createTextureImageFromFile(const VulkanContext &ctx, std::string_
   });
   return textureImage;
 }
+} // namespace
+
+Texture::Texture(const VulkanContext &ctx, std::string_view filePath)
+    : textureImage(createTextureImageFromFile(ctx, filePath)) {}

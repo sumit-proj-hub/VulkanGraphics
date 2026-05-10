@@ -1,7 +1,6 @@
 #include "core/VulkanContext.hpp"
 #include "render/Renderer.hpp"
-#include "render/SceneUBO.hpp"
-#include "resources/Texture.hpp"
+#include "scene/Camera.hpp"
 #include "vulkan/vulkan.hpp"
 #include "vulkan/vulkan_raii.hpp"
 #include <cassert>
@@ -11,40 +10,27 @@ std::vector<Buffer> FrameResources::createUniformBuffers(const VulkanContext &ct
   std::vector<Buffer> uniformBuffers;
   for (uint32_t i = 0; i < Renderer::maxFramesInFlight; ++i) {
     uniformBuffers.emplace_back(
-        Buffer::createHostVisible(ctx, vk::BufferUsageFlagBits::eUniformBuffer, nullptr, sizeof(SceneUBO), false));
+        Buffer::createHostVisible(ctx, vk::BufferUsageFlagBits::eUniformBuffer, nullptr, sizeof(Camera), false));
   }
   return uniformBuffers;
 }
 
-void FrameResources::createDescriptorSets(const VulkanContext &ctx,
-                                          const vk::raii::DescriptorSetLayout &descriptorSetLayout,
-                                          const Texture &texture) {
-  std::vector<vk::DescriptorSetLayout> layouts(Renderer::maxFramesInFlight, *descriptorSetLayout);
+void FrameResources::createGlobalDescriptorSets(const VulkanContext &ctx,
+                                                const vk::raii::DescriptorSetLayout &globalDescriptorSetLayout) {
+  std::vector<vk::DescriptorSetLayout> layouts(Renderer::maxFramesInFlight, *globalDescriptorSetLayout);
   vk::DescriptorSetAllocateInfo allocInfo{.descriptorPool = ctx.getDescriptorPool(),
                                           .descriptorSetCount = static_cast<uint32_t>(layouts.size()),
                                           .pSetLayouts = layouts.data()};
-  descriptorSets = ctx.getDevice().allocateDescriptorSets(allocInfo);
+  globalDescriptorSets = ctx.getDevice().allocateDescriptorSets(allocInfo);
 
   for (uint32_t i = 0; i < Renderer::maxFramesInFlight; ++i) {
-    vk::DescriptorBufferInfo bufferInfo{.buffer = uniformBuffers[i].get(), .offset = 0, .range = sizeof(SceneUBO)};
-    vk::DescriptorImageInfo imageInfo{.sampler = ctx.samplers.linear,
-                                      .imageView = texture.getImage().getView(),
-                                      .imageLayout = vk::ImageLayout::eShaderReadOnlyOptimal};
-
-    std::array descriptorWrites{
-        vk::WriteDescriptorSet{.dstSet = descriptorSets[i],
-                               .dstBinding = 0,
-                               .dstArrayElement = 0,
-                               .descriptorCount = 1,
-                               .descriptorType = vk::DescriptorType::eUniformBuffer,
-                               .pBufferInfo = &bufferInfo},
-        vk::WriteDescriptorSet{.dstSet = descriptorSets[i],
-                               .dstBinding = 1,
-                               .dstArrayElement = 0,
-                               .descriptorCount = 1,
-                               .descriptorType = vk::DescriptorType::eCombinedImageSampler,
-                               .pImageInfo = &imageInfo},
-    };
+    vk::DescriptorBufferInfo bufferInfo{.buffer = uniformBuffers[i].get(), .offset = 0, .range = sizeof(Camera)};
+    std::array descriptorWrites{vk::WriteDescriptorSet{.dstSet = globalDescriptorSets[i],
+                                                       .dstBinding = 0,
+                                                       .dstArrayElement = 0,
+                                                       .descriptorCount = 1,
+                                                       .descriptorType = vk::DescriptorType::eUniformBuffer,
+                                                       .pBufferInfo = &bufferInfo}};
     ctx.getDevice().updateDescriptorSets(descriptorWrites, {});
   }
 }

@@ -161,10 +161,10 @@ void VulkanContext::createCommandPool() {
 
 void VulkanContext::createDescriptorPool() {
   std::array poolSizes{vk::DescriptorPoolSize(vk::DescriptorType::eUniformBuffer, Renderer::maxFramesInFlight),
-                       vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, Renderer::maxFramesInFlight)};
+                       vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1)};
 
   vk::DescriptorPoolCreateInfo poolInfo{.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-                                        .maxSets = Renderer::maxFramesInFlight,
+                                        .maxSets = Renderer::maxFramesInFlight + 1,
                                         .poolSizeCount = poolSizes.size(),
                                         .pPoolSizes = poolSizes.data()};
   descriptorPool = vk::raii::DescriptorPool(device, poolInfo);

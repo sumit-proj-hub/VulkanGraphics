@@ -30,12 +30,7 @@ public:
   Swapchain(const Swapchain &) = delete;
   Swapchain &operator=(const Swapchain &) = delete;
 
-  void recreate(const VulkanContext &ctx, const Window &window) {
-    swapChain = nullptr;
-    imageViews.clear();
-    images.clear();
-    create(ctx, window);
-  };
+  void recreate(const VulkanContext &ctx, const Window &window);
 
   vk::ResultValue<uint32_t> acquireNextImage(vk::raii::Semaphore &presentCompleteSemaphore) const {
     return swapChain.acquireNextImage(UINT64_MAX, *presentCompleteSemaphore, nullptr);
